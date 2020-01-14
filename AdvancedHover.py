@@ -137,12 +137,12 @@ while True:
     print(abs(round(latitudeDiff + longitudeDiff, 4))) # Display distance to target
     # This is the landing procedure
     if land:
-        if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0001:
+        if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
             targetHeight = 2.5
             drop = True
-        if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002:
+        elif abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002:
             targetHeight = 10
-        if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
+        elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
             control.gear = True
             targetHeight = 40
             useSeaLevel = False
