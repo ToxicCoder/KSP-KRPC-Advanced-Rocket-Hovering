@@ -45,7 +45,7 @@ targetHeight = 200 # target altitude above the surface, in meters
 #
 # Select Target
 targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad"]
-targets = [[-1, -1, 40, False, False], # Just Hover
+targets = [[[-1, -1], [-1, -1], 40, False, False, False], # Just Hover
         [[-0.12707740447720042, -74.60547772969107], [0, 0], 40, False, True, False], # Tracking Station
         [[-0.09260748710094725, -74.66306148797543], [-0.12707740447720042, -74.60547772969107], 40, False, True, True], # Administration Building
         [[-0.09664795580728258, -74.61999866061524], [0, 0], 200, True, True, False], # VAB
@@ -191,11 +191,7 @@ while True:
             ht = (F / vessel.available_thrust)
             control.throttle = ht+(ht*(flight.pitch/90))
         else:
-            #if abs(flight.vertical_speed) > 5:
-            #    control.throttle = (F / vessel.available_thrust) / 2
-            #else:
-            #    control.throttle = (F / vessel.available_thrust) / 6
-            control.throttle = (F / vessel.available_thrust) / abs(-abs(flight.vertical_speed)+10)
+            control.throttle = (F / vessel.available_thrust) / abs(-abs(flight.vertical_speed)+7.5)
     else:
         if land:
             control.throttle = 0
