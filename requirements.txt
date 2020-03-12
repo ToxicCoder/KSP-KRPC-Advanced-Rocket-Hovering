@@ -1,2 +1,2 @@
-KRPC
+krpc
 numpy
