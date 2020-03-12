@@ -217,7 +217,18 @@ while True:
     vessel.auto_pilot.target_roll = 0
     vessel.auto_pilot.target_pitch = 90
 
-    #print((((targetLongitude - longitude)*16)*50) - (velocity[2]/2))
+    # Physics warp control
+    if targetLongitude == destinationLongitude and targetLatitude == destinationLatitude:
+        if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
+            if conn.space_center.physics_warp_factor != 0:
+                conn.space_center.physics_warp_factor = 0
+        elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.01:
+            if conn.space_center.physics_warp_factor != 1:
+                conn.space_center.physics_warp_factor = 1
+    
+    if abs(round(latitudeDiff + longitudeDiff, 4)) >= 0.01:
+        if conn.space_center.physics_warp_factor != 2:
+            conn.space_center.physics_warp_factor = 2
 
 
     #print(abs(round(latitudeDiff + longitudeDiff, 4))) # Display distance to target
