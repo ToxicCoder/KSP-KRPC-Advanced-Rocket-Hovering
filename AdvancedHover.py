@@ -191,9 +191,13 @@ while True:
             ht = (F / vessel.available_thrust)
             control.throttle = ht+(ht*(flight.pitch/90))
         else:
-            control.throttle = (F / vessel.available_thrust) / 4
+            #if abs(flight.vertical_speed) > 5:
+            #    control.throttle = (F / vessel.available_thrust) / 2
+            #else:
+            #    control.throttle = (F / vessel.available_thrust) / 6
+            control.throttle = (F / vessel.available_thrust) / abs(-abs(flight.vertical_speed)+10)
     else:
-        if longLat:
+        if land:
             control.throttle = 0
             break
 
@@ -221,10 +225,10 @@ while True:
     if land:
         if targetLongitude == destinationLongitude and targetLatitude == destinationLatitude:
             if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
-                targetHeight = 2.5
+                targetHeight = 40
                 drop = True
             elif abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002:
-                targetHeight = 15
+                targetHeight = 40
             elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
                 control.gear = True
                 targetHeight = 40
