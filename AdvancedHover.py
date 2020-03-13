@@ -48,10 +48,10 @@ targetHeight = 200 # target altitude above the surface, in meters
 # Select Target
 targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad"]
 targets = [[[-1, -1], [[-1, -1]], 40, False, False, False], # Just Hover
-        [[-0.12707740447720042, -74.60547772969107], [[0, 0]], 40, False, True, False], # Tracking Station
-        [[-0.09260748710094725, -74.66306148797543], [[0, 0]], 40, False, True, True], # Administration Building
-        [[-0.09664795580728258, -74.61999866061524], [[0, 0]], 200, True, True, False], # VAB
-        [[-0.09720758699224381, -74.55768331492169], [[0, 0]], 40, True, True, False]] # Landing Pad
+        [[-0.12707740447720042, -74.60547772969107], [], 40, False, True, False], # Tracking Station
+        [[-0.09260748710094725, -74.66306148797543], [], 40, False, True, False], # Administration Building
+        [[-0.09664795580728258, -74.61999866061524], [], 200, True, True, False], # VAB
+        [[-0.09720758699224381, -74.55768331492169], [], 40, True, True, False]] # Landing Pad
 
 print("Targets list:\n")
 i = 0
@@ -61,16 +61,26 @@ for x in targetNames:
 print("\n")
 selection = int(input("Please select a target's number from the list: "))
 
-choice = input("Do you want to go via a waypoint? ")
-if choice.lower() == "y" or choice.lower() == "yes":
-    waypointSelection = int(input("Please select a waypoint to go via: "))
-    del targets[selection][1][0]
-    targets[selection][1].append(targets[waypointSelection][0])
-    targets[selection][5] = True
-    print("Waypoint added")
-else:
-    targets[selection][5] = False
-    print("No waypoint added")
+def waypointSelect(targets, selection, loop=False):
+    print(targets[selection])
+    if not loop:
+        choice = input("Do you want to go via a waypoint? ").lower()
+    else:
+        choice = "yes"
+    if choice == "y" or choice == "yes":
+        waypointSelection = int(input("Please select a waypoint to go via: "))
+        targets[selection][1].append(targets[waypointSelection][0])
+        targets[selection][5] = True
+        print("Waypoint added")
+        choice = input("Do you want another waypoint? ").lower()
+        if choice == "y" or choice == "yes":
+            targets = waypointSelect(targets, selection, True)
+    else:
+        targets[selection][5] = False
+        print("No waypoint added")
+    return targets
+
+targets = waypointSelect(targets, selection)
 
 targetLatitude, targetLongitude = 0, 0
 
