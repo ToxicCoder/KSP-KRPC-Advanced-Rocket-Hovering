@@ -34,6 +34,7 @@ frameRate = 60
 # VAB:  -0.09664795580728258, -74.61999866061524
 # Admin Building:  -0.09260748710094725, -74.66306148797543
 # Landing Pad: -0.09720758699224381, -74.55768331492169
+# Secret mode: enter the number -1 on the selection screen and say no to waypoints
 
 # Variables
 drop = False
@@ -64,7 +65,6 @@ print("\n")
 selection = int(input("Please select a target's number from the list: "))
 
 def waypointSelect(targets, selection, loop=False):
-    print(targets[selection])
     if not loop:
         choice = input("Do you want to go via a waypoint? ").lower()
     else:
@@ -88,18 +88,27 @@ targetLatitude, targetLongitude = 0, 0
 
 targetData = targets[selection]
 
-if targetData[0] != -1:
-    if targetData[5]:
-        targetLatitude, targetLongitude = targetData[1][0][0], targetData[1][0][1]
-        waypointLatLon = targetData[1]
-        waypointLatLon.append(targetData[0])
+if selection != -1:
+    if targetData[0] != -1:
+        if targetData[5]:
+            targetLatitude, targetLongitude = targetData[1][0][0], targetData[1][0][1]
+            waypointLatLon = targetData[1]
+            waypointLatLon.append(targetData[0])
+        else:
+            targetLatitude, targetLongitude = targetData[0][0], targetData[0][1]
+            waypointLatLon = [targetData[0]]
+        useSealevel = targetData[3]
+        targetHeight = targetData[2]
+        land = targetData[4]
+        print(targetNames[selection])
     else:
-        targetLatitude, targetLongitude = targetData[0][0], targetData[0][1]
-        waypointLatLon = [targetData[0]]
-    useSealevel = targetData[3]
-    targetHeight = targetData[2]
-    land = targetData[4]
-    print(targetNames[selection])
+        destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
+        targetLatitude, targetLongitude = vessel.flight().latitude, vessel.flight().longitude
+        waypointLatLon = [[vessel.flight().latitude, vessel.flight().longitude]]
+        useSeaLevel = False
+        targetHeight = 40
+        land = False
+        print("Just Hover")
 else:
     destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
     targetLatitude, targetLongitude = vessel.flight().latitude, vessel.flight().longitude
@@ -107,7 +116,8 @@ else:
     useSeaLevel = False
     targetHeight = 40
     land = False
-    print("Just Hover")
+    longLat = False
+    print("Secret: No location hold")
 
 
 # More variable setup
@@ -237,7 +247,7 @@ while True:
     vessel.auto_pilot.target_pitch = 90
 
     # Physics warp control
-    if finals:
+    if finals and longlat:
         if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
             if conn.space_center.physics_warp_factor != 0:
                 conn.space_center.physics_warp_factor = 0
@@ -245,7 +255,7 @@ while True:
             if conn.space_center.physics_warp_factor != 1:
                 conn.space_center.physics_warp_factor = 1
     
-    if abs(round(latitudeDiff + longitudeDiff, 4)) >= 0.01:
+    if abs(round(latitudeDiff + longitudeDiff, 4)) >= 0.01 and longlat:
         if conn.space_center.physics_warp_factor != 2:
             conn.space_center.physics_warp_factor = 2
 
