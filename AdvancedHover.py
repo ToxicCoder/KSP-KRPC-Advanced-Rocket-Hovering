@@ -45,11 +45,11 @@ targetHeight = 200 # target altitude above the surface, in meters
 #
 # Select Target
 targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad"]
-targets = [[[-1, -1], [-1, -1], 40, False, False, False], # Just Hover
-        [[-0.12707740447720042, -74.60547772969107], [0, 0], 40, False, True, False], # Tracking Station
-        [[-0.09260748710094725, -74.66306148797543], [-0.12707740447720042, -74.60547772969107], 40, False, True, True], # Administration Building
-        [[-0.09664795580728258, -74.61999866061524], [0, 0], 200, True, True, False], # VAB
-        [[-0.09720758699224381, -74.55768331492169], [0, 0], 40, True, True, False]] # Landing Pad
+targets = [[[-1, -1], [[-1, -1]], 40, False, False, False], # Just Hover
+        [[-0.12707740447720042, -74.60547772969107], [[0, 0]], 40, False, True, False], # Tracking Station
+        [[-0.09260748710094725, -74.66306148797543], [[-0.12707740447720042, -74.60547772969107]], 40, False, True, True], # Administration Building
+        [[-0.09664795580728258, -74.61999866061524], [[0, 0]], 200, True, True, False], # VAB
+        [[-0.09720758699224381, -74.55768331492169], [[0, 0]], 40, True, True, False]] # Landing Pad
 
 print("Targets list:\n")
 i = 0
@@ -65,14 +65,12 @@ targetData = targets[selection]
 
 if targetData[0] != -1:
     if targetData[5]:
-        destinationLatitude, destinationLongitude = targetData[0][0], targetData[0][1]
-        targetLatitude, targetLongitude = targetData[1][0], targetData[1][1]
-        waypointLatitude, waypointLongitude = targetData[1][0], targetData[1][1]
+        targetLatitude, targetLongitude = targetData[1][0][0], targetData[1][0][1]
+        waypointLatLon = targetData[1]
+        waypointLatLon.append(targetData[0])
     else:
-        destinationLatitude, destinationLongitude = targetData[0][0], targetData[0][1]
         targetLatitude, targetLongitude = targetData[0][0], targetData[0][1]
-        waypointLatitude, waypointLongitude = targetData[0][0], targetData[0][1]
-    waypointLatitude, waypointLongitude = targetData[1][0], targetData[1][1]
+        waypointLatLon = [targetData[0]]
     useSealevel = targetData[3]
     targetHeight = targetData[2]
     land = targetData[4]
@@ -80,7 +78,7 @@ if targetData[0] != -1:
 else:
     destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
     targetLatitude, targetLongitude = vessel.flight().latitude, vessel.flight().longitude
-    waypointLatitude, waypointLongitude = vessel.flight().latitude, vessel.flight().longitude
+    waypointLatLon = [[vessel.flight().latitude, vessel.flight().longitude]]
     useSeaLevel = False
     targetHeight = 40
     land = False
@@ -137,6 +135,9 @@ average = [0, 0, 0, 0]
 
 vessel.auto_pilot.engage()
 
+currentWaypointID = 0
+finals = False
+
 # Main loop
 while True:
     #print(quaternion_to_euler(flight.rotation)[2] - -1.587310489250823)
@@ -160,11 +161,13 @@ while True:
     latitude = vessel.flight().latitude
     longitude = vessel.flight().longitude
 
-    latitudeDiff = targetLatitude - latitude
-    longitudeDiff = targetLongitude - longitude
+    waypointLatitudeDiff = waypointLatLon[currentWaypointID][0] - latitude
+    waypointLongitudeDiff = waypointLatLon[currentWaypointID][1] - longitude
 
-    waypointLatitudeDiff = waypointLatitude - latitude
-    waypointLongitudeDiff = waypointLongitude - longitude
+    latitudeDiff = waypointLatitudeDiff#targetLatitude - latitude
+    longitudeDiff = waypointLongitudeDiff#targetLongitude - longitude
+
+    targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
 
     heading = vessel.flight().heading
     angvel = vessel.angular_velocity(ref_frame)
@@ -214,7 +217,7 @@ while True:
     vessel.auto_pilot.target_pitch = 90
 
     # Physics warp control
-    if targetLongitude == destinationLongitude and targetLatitude == destinationLatitude:
+    if finals:
         if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
             if conn.space_center.physics_warp_factor != 0:
                 conn.space_center.physics_warp_factor = 0
@@ -230,7 +233,7 @@ while True:
     #print(abs(round(latitudeDiff + longitudeDiff, 4))) # Display distance to target
     # This is the landing procedure
     if land:
-        if targetLongitude == destinationLongitude and targetLatitude == destinationLatitude:
+        if finals:
             if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
                 targetHeight = 40
                 drop = True
@@ -245,7 +248,14 @@ while True:
                 targetHeight = origTargHeight
                 useSealevel = True
         else:
-            if targetData[5]:
-                if abs(round(waypointLatitudeDiff + waypointLongitudeDiff, 4)) < 0.01:
-                    targetLatitude, targetLongitude = destinationLatitude, destinationLongitude
+            print(abs(round(waypointLatitudeDiff + waypointLongitudeDiff, 4)))
+            if abs(round(waypointLatitudeDiff + waypointLongitudeDiff, 4)) < 0.01:
+                targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
+                currentWaypointID += 1
+                if currentWaypointID >= len(waypointLatLon)-1:
+                    finals = True
+                    currentWaypointID = len(waypointLatLon)-1
+                    #currentWaypointID += -1
+        print(waypointLatLon[currentWaypointID])
+    #print(waypointLatLon[currentWaypointID])
     time.sleep(0.01)
