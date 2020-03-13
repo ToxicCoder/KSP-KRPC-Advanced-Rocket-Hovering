@@ -28,9 +28,10 @@ print(str(latitude)+", "+str(longitude))
 # Name latitude, longitude
 #
 # Just Hover Mode:  Nothing, Nothing
-# Tracking Station:  -0.12718455163649123, -74.60535376109283
+# Tracking Station:  -0.12707740447720042, -74.60547772969107
 # VAB:  -0.09664795580728258, -74.61999866061524
-# Admin Building:  -0.09217390347059799, -74.66250078566117
+# Admin Building:  -0.09260748710094725, -74.66306148797543
+# Landing Pad: -0.09720758699224381, -74.55768331492169
 
 # Variables
 drop = False
@@ -41,7 +42,8 @@ useSeaLevel = False
 targetHeight = 200 # target altitude above the surface, in meters
 
 # For adding custom targets use this format:
-# "Name of target":[[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints]
+# Add "Name of target" to targetNames
+# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints]
 #
 # Select Target
 targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad"]
@@ -140,11 +142,10 @@ finals = False
 
 # Main loop
 while True:
-    #print(quaternion_to_euler(flight.rotation)[2] - -1.587310489250823)
     startTime = time.time()
 
     rollPrevious = rollCurrent
-    rollCurrent = quaternion_to_euler(flight.rotation)[0]#vessel.flight().roll
+    rollCurrent = quaternion_to_euler(flight.rotation)[0]
     rollDifference = rollCurrent - rollPrevious
     rollSpeed = rollDifference / duration
     time.sleep(0.025)
@@ -152,7 +153,6 @@ while True:
     duration = endTime - startTime
     del average[0]
     average.append(rollSpeed)
-    #print(round(listAverage(average), 2))
 
     # Change Targets
     heightControl = control.forward
@@ -161,11 +161,8 @@ while True:
     latitude = vessel.flight().latitude
     longitude = vessel.flight().longitude
 
-    waypointLatitudeDiff = waypointLatLon[currentWaypointID][0] - latitude
-    waypointLongitudeDiff = waypointLatLon[currentWaypointID][1] - longitude
-
-    latitudeDiff = waypointLatitudeDiff#targetLatitude - latitude
-    longitudeDiff = waypointLongitudeDiff#targetLongitude - longitude
+    latitudeDiff = waypointLatLon[currentWaypointID][0] - latitude
+    longitudeDiff = waypointLatLon[currentWaypointID][1] - longitude
 
     targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
 
@@ -229,8 +226,6 @@ while True:
         if conn.space_center.physics_warp_factor != 2:
             conn.space_center.physics_warp_factor = 2
 
-
-    #print(abs(round(latitudeDiff + longitudeDiff, 4))) # Display distance to target
     # This is the landing procedure
     if land:
         if finals:
@@ -248,14 +243,10 @@ while True:
                 targetHeight = origTargHeight
                 useSealevel = True
         else:
-            print(abs(round(waypointLatitudeDiff + waypointLongitudeDiff, 4)))
-            if abs(round(waypointLatitudeDiff + waypointLongitudeDiff, 4)) < 0.01:
+            if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.01:
                 targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
                 currentWaypointID += 1
                 if currentWaypointID >= len(waypointLatLon)-1:
                     finals = True
                     currentWaypointID = len(waypointLatLon)-1
-                    #currentWaypointID += -1
-        print(waypointLatLon[currentWaypointID])
-    #print(waypointLatLon[currentWaypointID])
     time.sleep(0.01)
