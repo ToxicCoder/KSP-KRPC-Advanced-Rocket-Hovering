@@ -23,6 +23,8 @@ longitude = vessel.flight().longitude
 
 print(str(latitude)+", "+str(longitude))
 
+frameRate = 60
+
 # Target Locations
 #
 # Name latitude, longitude
@@ -249,4 +251,7 @@ while True:
                 if currentWaypointID >= len(waypointLatLon)-1:
                     finals = True
                     currentWaypointID = len(waypointLatLon)-1
-    time.sleep(0.01)
+    try:
+        time.sleep((1/frameRate)-(time.time()-startTime))
+    except:
+        pass
