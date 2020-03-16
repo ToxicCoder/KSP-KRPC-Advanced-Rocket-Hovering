@@ -100,6 +100,7 @@ if selection != -1:
         useSealevel = targetData[3]
         targetHeight = targetData[2]
         land = targetData[4]
+        longLat = True
         print(targetNames[selection])
     else:
         destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
@@ -108,6 +109,7 @@ if selection != -1:
         useSeaLevel = False
         targetHeight = 40
         land = False
+        longLat = False
         print("Just Hover")
 else:
     destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
@@ -133,9 +135,8 @@ if str(vessel.situation)[16:] == "landed":
 
 targetRoll = 0
 
-rollCurrent = 0
-rollDifference = 1
-rollSpeed = 0
+speedCurrent = 0
+speedDifference = 1
 
 startTime = 0
 endTime = 1
@@ -173,19 +174,17 @@ vessel.auto_pilot.engage()
 currentWaypointID = 0
 finals = False
 
+a = 0
+openLegs = False
+
 # Main loop
 while True:
     startTime = time.time()
 
-    rollPrevious = rollCurrent
-    rollCurrent = quaternion_to_euler(flight.rotation)[0]
-    rollDifference = rollCurrent - rollPrevious
-    rollSpeed = rollDifference / duration
-    time.sleep(0.025)
-    endTime = time.time()
-    duration = endTime - startTime
-    del average[0]
-    average.append(rollSpeed)
+    speedPrevious = speedCurrent
+    speedCurrent = flight.vertical_speed
+    speedDifference = speedCurrent - speedPrevious
+    speedNext = speedCurrent + speedDifference
 
     # Change Targets
     heightControl = control.forward
@@ -215,7 +214,7 @@ while True:
     #   g   to counteract gravity
     #   -v  to push the vertical speed towards 0
     #   e   to push the altitude error towards 0
-    a = g - (flight.vertical_speed*2) + alt_error
+    a = ((g - (flight.vertical_speed*5) + alt_error)+a)/2
 
     # Compute throttle setting using newton's law F=ma and change throttle
     F = vessel.mass * a
@@ -247,17 +246,14 @@ while True:
     vessel.auto_pilot.target_pitch = 90
 
     # Physics warp control
-    if finals and longlat:
+    if longLat:
         if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
             if conn.space_center.physics_warp_factor != 0:
-                conn.space_center.physics_warp_factor = 0
-        elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.01:
-            if conn.space_center.physics_warp_factor != 1:
-                conn.space_center.physics_warp_factor = 1
-    
-    if abs(round(latitudeDiff + longitudeDiff, 4)) >= 0.01 and longlat:
-        if conn.space_center.physics_warp_factor != 2:
-            conn.space_center.physics_warp_factor = 2
+                if finals:
+                    conn.space_center.physics_warp_factor = 0
+        else:
+            if conn.space_center.physics_warp_factor != 2:
+                conn.space_center.physics_warp_factor = 2
 
     # This is the landing procedure
     if land:
@@ -265,10 +261,28 @@ while True:
             if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
                 targetHeight = 40
                 drop = True
+
+                if abs(flight.surface_altitude / flight.vertical_speed) <= 6:
+                    if openLegs:
+                        control.gear = True
+                    else:
+                        control.gear = False
+                        openLegs = True
+                else:
+                    openLegs = False
             elif abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002:
                 targetHeight = 40
+
+                if abs(flight.surface_altitude / flight.vertical_speed) <= 6:
+                    if openLegs:
+                        control.gear = True
+                    else:
+                        control.gear = False
+                        openLegs = True
+                else:
+                    openLegs = False
             elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
-                control.gear = True
+                control.gear = False
                 targetHeight = 40
                 useSeaLevel = False
             elif not abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
@@ -286,3 +300,5 @@ while True:
         time.sleep((1/frameRate)-(time.time()-startTime))
     except:
         pass
+    endTime = time.time()
+    duration = endTime - startTime
