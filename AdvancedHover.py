@@ -183,8 +183,10 @@ while True:
 
     speedPrevious = speedCurrent
     speedCurrent = flight.vertical_speed
-    speedDifference = speedCurrent - speedPrevious
+    speedDifference = (speedCurrent - speedPrevious)/duration
     speedNext = speedCurrent + speedDifference
+
+    landed = str(vessel.situation)[16:] == "landed"
 
     # Change Targets
     heightControl = control.forward
@@ -218,7 +220,7 @@ while True:
 
     # Compute throttle setting using newton's law F=ma and change throttle
     F = vessel.mass * a
-    if str(vessel.situation)[16:] != "landed":
+    if not landed:
         if not drop:
             ht = (F / vessel.available_thrust)
             control.throttle = ht+(ht*(flight.pitch/90))
@@ -262,14 +264,17 @@ while True:
                 targetHeight = 40
                 drop = True
 
-                if abs(flight.surface_altitude / flight.vertical_speed) <= 6:
-                    if openLegs:
-                        control.gear = True
-                    else:
-                        control.gear = False
-                        openLegs = True
+                if landed and not vessel.parts.legs[0].deployed:
+                            control.gear = True
                 else:
-                    openLegs = False
+                    if abs(flight.surface_altitude / flight.vertical_speed) <= 6:
+                        if openLegs:
+                            control.gear = True
+                        else:
+                            control.gear = False
+                            openLegs = True
+                    else:
+                        openLegs = False
             elif abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002:
                 targetHeight = 40
 
