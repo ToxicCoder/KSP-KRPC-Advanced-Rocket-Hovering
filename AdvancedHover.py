@@ -23,7 +23,11 @@ longitude = vessel.flight().longitude
 
 print(str(latitude)+", "+str(longitude))
 
+# Customisation
 frameRate = 60
+legDeployTime = 5.75
+maxHorizSpeed = 15 # Per axis
+dropSpeed = -5
 
 # Target Locations
 #
@@ -225,7 +229,10 @@ while True:
             ht = (F / vessel.available_thrust)
             control.throttle = ht+(ht*(flight.pitch/90))
         else:
-            control.throttle = (F / vessel.available_thrust) / abs(-abs(flight.vertical_speed)+7.5)
+            try:
+                control.throttle = (F / vessel.available_thrust) + ((dropSpeed - flight.vertical_speed)*2)
+            except:
+                control.throttle = (F / vessel.available_thrust) / 4
     else:
         if land:
             control.throttle = 0
@@ -234,14 +241,14 @@ while True:
     # Position Control
     velocity = vessel.flight(ref_frame).velocity
     if longLat:
-        if abs(velocity[2]) < 15:
+        if abs(velocity[2]) < maxHorizSpeed:
             control.right = (((targetLongitude - longitude)*16)*50) - (velocity[2]/2)
         else:
-            control.right = -velocity[2] / 15 / 2
-        if abs(velocity[1]) < 15:
+            control.right = -velocity[2] / maxHorizSpeed
+        if abs(velocity[1]) < maxHorizSpeed:
             control.up = -((((targetLatitude - latitude)*16)*50) - (velocity[1]/2))
         else:
-            control.up = velocity[1] / 15 / 2
+            control.up = velocity[1] / maxHorizSpeed
 
     # This section keeps the rocket stable
     vessel.auto_pilot.target_roll = 0
@@ -260,32 +267,22 @@ while True:
     # This is the landing procedure
     if land:
         if finals:
-            if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
+            if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
                 targetHeight = 40
                 drop = True
 
                 if landed and not vessel.parts.legs[0].deployed:
-                            control.gear = True
+                    control.gear = True
+                    control.sas = True
+                    time.sleep(0.1)
+                    control.sas_mode = control.sas_mode.radial
                 else:
-                    if abs(flight.surface_altitude / flight.vertical_speed) <= 6:
+                    if abs(flight.surface_altitude / flight.vertical_speed) <= 5.75:
                         if openLegs:
                             control.gear = True
                         else:
                             control.gear = False
                             openLegs = True
-                    else:
-                        openLegs = False
-            elif abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002:
-                targetHeight = 40
-
-                if abs(flight.surface_altitude / flight.vertical_speed) <= 6:
-                    if openLegs:
-                        control.gear = True
-                    else:
-                        control.gear = False
-                        openLegs = True
-                else:
-                    openLegs = False
             elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
                 control.gear = False
                 targetHeight = 40
@@ -307,3 +304,9 @@ while True:
         pass
     endTime = time.time()
     duration = endTime - startTime
+
+if landed and not vessel.parts.legs[0].deployed:
+    control.gear = True
+    control.sas = True
+    time.sleep(0.1)
+    control.sas_mode = control.sas_mode.radial
