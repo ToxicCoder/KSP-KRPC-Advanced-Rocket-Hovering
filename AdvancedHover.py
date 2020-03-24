@@ -1,4 +1,6 @@
 import krpc, time, math, os, numpy
+import numpy as np
+from math import *
 conn = krpc.connect(name='Hover V2')
 vessel = conn.space_center.active_vessel
 control = vessel.control
@@ -181,6 +183,8 @@ finals = False
 a = 0
 openLegs = False
 
+control.rcs = True
+
 # Main loop
 while True:
     startTime = time.time()
@@ -242,27 +246,33 @@ while True:
     velocity = vessel.flight(ref_frame).velocity
     if longLat:
         if abs(velocity[2]) < maxHorizSpeed:
-            control.right = (((targetLongitude - longitude)*16)*50) - (velocity[2]/2)
+            longitudeControl = (((targetLongitude - longitude)*16)*50) - (velocity[2]/2)
         else:
-            control.right = -velocity[2] / maxHorizSpeed
+            longitudeControl = -velocity[2] / maxHorizSpeed
         if abs(velocity[1]) < maxHorizSpeed:
-            control.up = -((((targetLatitude - latitude)*16)*50) - (velocity[1]/2))
+            latitudeControl = -((((targetLatitude - latitude)*16)*50) - (velocity[1]/2))
         else:
-            control.up = velocity[1] / maxHorizSpeed
+            latitudeControl = velocity[1] / maxHorizSpeed
 
     # This section keeps the rocket stable
-    vessel.auto_pilot.target_roll = 0
-    vessel.auto_pilot.target_pitch = 90
+    controlRot = (90, -latitudeControl*10, longitudeControl*10) # 90, latitude, longitude
+
+    rotation = (round(degrees(quaternion_to_euler(flight.rotation)[0]), 2), round(degrees(quaternion_to_euler(flight.rotation)[1]), 2), round(degrees(quaternion_to_euler(flight.rotation)[2]), 2))
+    #controlRotFinal = ([a/b for a,b in zip(controlRot,rotation)])
+
+    vessel.auto_pilot.target_direction = controlRot
+    apDirection = vessel.auto_pilot.target_direction
+    print(round(apDirection[0], 2), round(apDirection[1], 2), round(apDirection[2], 2), " : ", rotation)
 
     # Physics warp control
-    if longLat:
-        if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
-            if conn.space_center.physics_warp_factor != 0:
-                if finals:
-                    conn.space_center.physics_warp_factor = 0
-        else:
-            if conn.space_center.physics_warp_factor != 2:
-                conn.space_center.physics_warp_factor = 2
+    #if longLat:
+    #    if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
+    #        if conn.space_center.physics_warp_factor != 0:
+    #            if finals:
+    #                conn.space_center.physics_warp_factor = 0
+    #    else:
+    #        if conn.space_center.physics_warp_factor != 2:
+    #            conn.space_center.physics_warp_factor = 2
 
     # This is the landing procedure
     if land:
