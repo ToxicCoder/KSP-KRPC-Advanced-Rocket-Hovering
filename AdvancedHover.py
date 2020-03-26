@@ -26,10 +26,10 @@ longitude = vessel.flight().longitude
 print(str(latitude)+", "+str(longitude))
 
 # Customisation
-frameRate = 60
-legDeployTime = 5.75
-maxHorizSpeed = 15 # Per axis
-dropSpeed = -5
+frameRate = 60 # can be decreased depending on situation
+legDeployTime = 5.75 # Actual deploy time is 6 seconds but it's modified to improve timing
+maxHorizSpeed = 100 # Doesn't need to be set as the equations factor in enough data to stay safe
+dropSpeed = -7.5 # Can be adjusted to give cooler results
 
 # Target Locations
 #
@@ -47,28 +47,37 @@ drop = False
 land = False
 longLat = True
 useSeaLevel = False
-
+dropAccuracy = 1
 targetHeight = 200 # target altitude above the surface, in meters
 
 # For adding custom targets use this format:
 # Add "Name of target" to targetNames
-# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints]
+# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints, accuracy for landing drop]
 #
 # Select Target
-targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad"]
-targets = [[[-1, -1], [[-1, -1]], 40, False, False, False], # Just Hover
-        [[-0.12707740447720042, -74.60547772969107], [], 40, False, True, False], # Tracking Station
-        [[-0.09260748710094725, -74.66306148797543], [], 40, False, True, False], # Administration Building
-        [[-0.09664795580728258, -74.61999866061524], [], 200, True, True, False], # VAB
-        [[-0.09720758699224381, -74.55768331492169], [], 40, True, True, False]] # Landing Pad
+targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad", "Mission Control", "Water Tower"]
+targets = [[[-1, -1], [[-1, -1]], 40, True, False, False, 1], # Just Hover
+        [[-0.12707740447720042, -74.60547772969107], [], 40, False, True, False, 1], # Tracking Station
+        [[-0.09260748710094725, -74.66306148797543], [], 40, False, True, False, 1], # Administration Building
+        [[-0.09664795580728258, -74.61999866061524], [], 200, True, True, False, 1], # VAB
+        [[-0.09720758699224381, -74.55768331492169], [], 40, False, True, False, 1], # Landing Pad
+        [[-0.07486285149048191, -74.61355530825483], [], 40, False, True, False, 1], # Mission Control
+        [[-0.058009709890787194, -74.64144279145307], [], 40, False, True, False, 4]]
 
 print("Targets list:\n")
 i = 0
 for x in targetNames:
     print(str(i) + ": " + x)
     i += 1
-print("\n")
-selection = int(input("Please select a target's number from the list: "))
+def getChoice():
+    try:
+        print("\n")
+        selection = int(input("Please select a target's number from the list: "))
+    except ValueError:
+        print("INVALID CHOICE")
+        selection = getChoice()
+    return selection
+selection = getChoice()
 
 def waypointSelect(targets, selection, loop=False):
     if not loop:
@@ -107,6 +116,7 @@ if selection != -1:
         targetHeight = targetData[2]
         land = targetData[4]
         longLat = True
+        dropAccuracy = targetData[6]
         print(targetNames[selection])
     else:
         destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
@@ -121,8 +131,8 @@ else:
     destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
     targetLatitude, targetLongitude = vessel.flight().latitude, vessel.flight().longitude
     waypointLatLon = [[vessel.flight().latitude, vessel.flight().longitude]]
-    useSeaLevel = False
-    targetHeight = 40
+    useSeaLevel = True
+    targetHeight = 100
     land = False
     longLat = False
     print("Secret: No location hold")
@@ -244,40 +254,42 @@ while True:
 
     # Position Control
     velocity = vessel.flight(ref_frame).velocity
-    if longLat:
+    touchDown = finals and abs(flight.surface_altitude / flight.vertical_speed) < 3
+    if longLat and not touchDown:
         if abs(velocity[2]) < maxHorizSpeed:
-            longitudeControl = (((targetLongitude - longitude)*16)*50) - (velocity[2]/2)
+            longitudeControl = ((np.clip(longitudeDiff, -0.02, 0.02)*16)*50) - (velocity[2]/2)
         else:
             longitudeControl = -velocity[2] / maxHorizSpeed
         if abs(velocity[1]) < maxHorizSpeed:
-            latitudeControl = -((((targetLatitude - latitude)*16)*50) - (velocity[1]/2))
+            latitudeControl = -(((np.clip(latitudeDiff*2, -0.02, 0.02)*16)*50) - (velocity[1]/2))
         else:
             latitudeControl = velocity[1] / maxHorizSpeed
 
-    # This section keeps the rocket stable
-    controlRot = (90, -latitudeControl*10, longitudeControl*10) # 90, latitude, longitude
-
-    rotation = (round(degrees(quaternion_to_euler(flight.rotation)[0]), 2), round(degrees(quaternion_to_euler(flight.rotation)[1]), 2), round(degrees(quaternion_to_euler(flight.rotation)[2]), 2))
-    #controlRotFinal = ([a/b for a,b in zip(controlRot,rotation)])
-
-    vessel.auto_pilot.target_direction = controlRot
-    apDirection = vessel.auto_pilot.target_direction
-    print(round(apDirection[0], 2), round(apDirection[1], 2), round(apDirection[2], 2), " : ", rotation)
+        if finals:
+            controlRot = (90, -latitudeControl*10, longitudeControl*10) # 90, latitude, longitude
+        else:
+            controlRot = (90, (-latitudeControl*10)/(abs(ht)*2), (longitudeControl*10)/(abs(ht)*2)) # 90, latitude, longitude
+        vessel.auto_pilot.target_direction = controlRot
+        apDirection = vessel.auto_pilot.target_direction
+    else:
+        vessel.auto_pilot.target_roll = 0
+        vessel.auto_pilot.target_heading = 0
+        vessel.auto_pilot.target_pitch = 90
 
     # Physics warp control
-    #if longLat:
-    #    if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
-    #        if conn.space_center.physics_warp_factor != 0:
-    #            if finals:
-    #                conn.space_center.physics_warp_factor = 0
-    #    else:
-    #        if conn.space_center.physics_warp_factor != 2:
-    #            conn.space_center.physics_warp_factor = 2
+    if longLat:
+        if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
+            if conn.space_center.physics_warp_factor != 0:
+                if finals:
+                    conn.space_center.physics_warp_factor = 0
+        else:
+            if conn.space_center.physics_warp_factor != 2:
+                conn.space_center.physics_warp_factor = 2
 
     # This is the landing procedure
     if land:
         if finals:
-            if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002 or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
+            if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002/dropAccuracy or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
                 targetHeight = 40
                 drop = True
 
@@ -294,15 +306,18 @@ while True:
                             control.gear = False
                             openLegs = True
             elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
+                drop = False
                 control.gear = False
                 targetHeight = 40
                 useSeaLevel = False
             elif not abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
+                drop = False
                 control.gear = False
                 targetHeight = origTargHeight
                 useSealevel = True
         else:
             if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.01:
+                drop = False
                 targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
                 currentWaypointID += 1
                 if currentWaypointID >= len(waypointLatLon)-1:
@@ -315,8 +330,11 @@ while True:
     endTime = time.time()
     duration = endTime - startTime
 
+vessel.auto_pilot.disengage()
+
 if landed and not vessel.parts.legs[0].deployed:
     control.gear = True
-    control.sas = True
-    time.sleep(0.1)
-    control.sas_mode = control.sas_mode.radial
+
+control.sas = True
+time.sleep(0.1)
+control.sas_mode = control.sas_mode.radial
