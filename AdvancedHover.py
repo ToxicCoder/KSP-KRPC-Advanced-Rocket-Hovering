@@ -240,7 +240,11 @@ while True:
     F = vessel.mass * a
     if not landed:
         if not drop:
-            ht = (F / vessel.available_thrust)
+            try:
+                ht = (F / vessel.available_thrust)
+            except ZeroDivisionError:
+                print("Loss of thrust detected! Please check your engines still exist.")
+                break
             control.throttle = ht+(ht*(flight.pitch/90))
         else:
             try:
