@@ -27,7 +27,7 @@ print(str(latitude)+", "+str(longitude))
 
 # Customisation
 frameRate = 60 # can be decreased depending on situation
-legDeployTime = 5.75 # Actual deploy time is 6 seconds but it's modified to improve timing
+legDeployTime = 6 # Actual deploy time is 6 seconds but it's modified to improve timing
 maxHorizSpeed = 100 # Doesn't need to be set as the equations factor in enough data to stay safe
 dropSpeed = -7.5 # Can be adjusted to give cooler results
 
@@ -52,17 +52,18 @@ targetHeight = 200 # target altitude above the surface, in meters
 
 # For adding custom targets use this format:
 # Add "Name of target" to targetNames
-# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints, accuracy for landing drop]
+# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints, accuracy for landing drop, accuracy for locomotion / control divider]
 #
 # Select Target
-targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad", "Mission Control", "Water Tower"]
-targets = [[[-1, -1], [[-1, -1]], 40, True, False, False, 1], # Just Hover
+targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad", "Mission Control", "Water Tower SPH", "Water Tower Launchpad"]
+targets = [[[-1, -1], [[-1, -1]], 40, True, False, False, 1, 1], # Just Hover
         [[-0.12707740447720042, -74.60547772969107], [], 40, False, True, False, 1], # Tracking Station
         [[-0.09260748710094725, -74.66306148797543], [], 40, False, True, False, 1], # Administration Building
         [[-0.09664795580728258, -74.61999866061524], [], 200, True, True, False, 1], # VAB
         [[-0.09720758699224381, -74.55768331492169], [], 40, False, True, False, 1], # Landing Pad
         [[-0.07486285149048191, -74.61355530825483], [], 40, False, True, False, 1], # Mission Control
-        [[-0.058009709890787194, -74.64144279145307], [], 40, False, True, False, 4]]
+        [[-0.058009709890787194, -74.64144279145307], [], 40, False, True, False, 4], # Water Tower SPH
+        [[-0.09212809071597255, -74.55249954150645], [], 40, False, True, False, 4]] # Water Tower launchpad
 
 print("Targets list:\n")
 i = 0
@@ -238,17 +239,19 @@ while True:
 
     # Compute throttle setting using newton's law F=ma and change throttle
     F = vessel.mass * a
+    if vessel.available_thrust == 0:
+        raise Exception("Loss of thrust detected! Please check your engines still exist.")
     if not landed:
         if not drop:
             try:
                 ht = (F / vessel.available_thrust)
             except ZeroDivisionError:
-                print("Loss of thrust detected! Please check your engines still exist.")
+                raise Exception("Loss of thrust detected! Please check your engines still exist.")
                 break
             control.throttle = ht+(ht*(flight.pitch/90))
         else:
             try:
-                control.throttle = (F / vessel.available_thrust) + ((dropSpeed - flight.vertical_speed)*2)
+                control.throttle = (F / vessel.available_thrust) / (8/(dropSpeed - flight.vertical_speed))
             except:
                 control.throttle = (F / vessel.available_thrust) / 4
     else:
@@ -261,18 +264,20 @@ while True:
     touchDown = finals and abs(flight.surface_altitude / flight.vertical_speed) < 3
     if longLat and not touchDown:
         if abs(velocity[2]) < maxHorizSpeed:
-            longitudeControl = ((np.clip(longitudeDiff, -0.02, 0.02)*16)*50) - (velocity[2]/2)
+            longitudeControl = ((longitudeDiff*16)*35) - (velocity[2]/2) #((np.clip(longitudeDiff, -0.02, 0.02)*16)*35) - (velocity[2]/2)
         else:
             longitudeControl = -velocity[2] / maxHorizSpeed
         if abs(velocity[1]) < maxHorizSpeed:
-            latitudeControl = -(((np.clip(latitudeDiff*2, -0.02, 0.02)*16)*50) - (velocity[1]/2))
+            latitudeControl = -(((latitudeDiff*16)*35) - (velocity[1]/2)) #-(((np.clip(latitudeDiff, -0.02, 0.02)*16)*35) - (velocity[1]/2))
         else:
             latitudeControl = velocity[1] / maxHorizSpeed
 
         if finals:
-            controlRot = (90, -latitudeControl*10, longitudeControl*10) # 90, latitude, longitude
+            controlRot = [90, -latitudeControl*10, longitudeControl*10]
         else:
-            controlRot = (90, (-latitudeControl*10)/(abs(ht)*2), (longitudeControl*10)/(abs(ht)*2)) # 90, latitude, longitude
+            controlRot = [90, (-latitudeControl*5)/(abs(ht)*2), (longitudeControl*5)/(abs(ht)*2)]
+        controlRot[1] = np.clip(controlRot[1], -45, 45)
+        controlRot[2] = np.clip(controlRot[2], -45, 45)
         vessel.auto_pilot.target_direction = controlRot
         apDirection = vessel.auto_pilot.target_direction
     else:
@@ -336,9 +341,11 @@ while True:
 
 vessel.auto_pilot.disengage()
 
-if landed and not vessel.parts.legs[0].deployed:
-    control.gear = True
-
-control.sas = True
-time.sleep(0.1)
-control.sas_mode = control.sas_mode.radial
+try:
+    if landed and not vessel.parts.legs[0].deployed:
+        control.gear = True
+        control.sas = True
+        time.sleep(0.1)
+        control.sas_mode = control.sas_mode.radial
+except:
+    pass
