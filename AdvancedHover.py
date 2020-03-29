@@ -27,7 +27,7 @@ print(str(latitude)+", "+str(longitude))
 
 # Customisation
 frameRate = 60 # can be decreased depending on situation
-legDeployTime = 6 # Actual deploy time is 6 seconds but it's modified to improve timing
+legDeployTime = 10 # Actual deploy time is 6 seconds but it's modified to improve timing
 maxHorizSpeed = 100 # Doesn't need to be set as the equations factor in enough data to stay safe
 dropSpeed = -7.5 # Can be adjusted to give cooler results
 
@@ -301,19 +301,8 @@ while True:
             if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002/dropAccuracy or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
                 targetHeight = 40
                 drop = True
-
-                if landed and not vessel.parts.legs[0].deployed:
+                if abs(flight.surface_altitude / flight.vertical_speed) <= legDeployTime:
                     control.gear = True
-                    control.sas = True
-                    time.sleep(0.1)
-                    control.sas_mode = control.sas_mode.radial
-                else:
-                    if abs(flight.surface_altitude / flight.vertical_speed) <= 5.75:
-                        if openLegs:
-                            control.gear = True
-                        else:
-                            control.gear = False
-                            openLegs = True
             elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
                 drop = False
                 control.gear = False
