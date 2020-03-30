@@ -5,7 +5,7 @@ conn = krpc.connect(name='Hover V2')
 vessel = conn.space_center.active_vessel
 control = vessel.control
 flight = vessel.flight(vessel.orbit.body.reference_frame)
-os.system("cls")
+os.system("cls") # Clears screen - remove if using on Linux
 
 print(vessel.name)
 
@@ -52,18 +52,13 @@ targetHeight = 200 # target altitude above the surface, in meters
 
 # For adding custom targets use this format:
 # Add "Name of target" to targetNames
-# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints, accuracy for landing drop, accuracy for locomotion / control divider]
+# [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints, accuracy for landing drop]
 #
 # Select Target
-targetNames = ["Just Hover", "Tracking Station", "Administration Building", "VAB", "Landing Pad", "Mission Control", "Water Tower SPH", "Water Tower Launchpad"]
-targets = [[[-1, -1], [[-1, -1]], 40, True, False, False, 1, 1], # Just Hover
-        [[-0.12707740447720042, -74.60547772969107], [], 40, False, True, False, 1], # Tracking Station
-        [[-0.09260748710094725, -74.66306148797543], [], 40, False, True, False, 1], # Administration Building
-        [[-0.09664795580728258, -74.61999866061524], [], 200, True, True, False, 1], # VAB
-        [[-0.09720758699224381, -74.55768331492169], [], 40, False, True, False, 1], # Landing Pad
-        [[-0.07486285149048191, -74.61355530825483], [], 40, False, True, False, 1], # Mission Control
-        [[-0.058009709890787194, -74.64144279145307], [], 40, False, True, False, 4], # Water Tower SPH
-        [[-0.09212809071597255, -74.55249954150645], [], 40, False, True, False, 4]] # Water Tower launchpad
+targetNames = np.load("targetNames.npy", allow_pickle=True)
+targets = np.load("targets.npy", allow_pickle=True)
+
+print(targets)
 
 print("Targets list:\n")
 i = 0
@@ -207,9 +202,6 @@ while True:
 
     landed = str(vessel.situation)[16:] == "landed"
 
-    # Change Targets
-    heightControl = control.forward
-
     # Get data about flight
     latitude = vessel.flight().latitude
     longitude = vessel.flight().longitude
@@ -222,7 +214,7 @@ while True:
     heading = vessel.flight().heading
     angvel = vessel.angular_velocity(ref_frame)
 
-    targetHeight += heightControl / 4
+    targetHeight += control.forward / 4
 
     # This is for the change from sea-level to surface based altitude measuring
     if useSeaLevel:
