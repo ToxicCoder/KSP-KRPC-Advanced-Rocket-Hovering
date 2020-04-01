@@ -5,7 +5,10 @@ conn = krpc.connect(name='Hover V2')
 vessel = conn.space_center.active_vessel
 control = vessel.control
 flight = vessel.flight(vessel.orbit.body.reference_frame)
-os.system("cls") # Clears screen - remove if using on Linux
+if os.name == 'posix':
+    os.system("clear")
+else:
+    os.system("cls")
 
 print(vessel.name)
 
@@ -58,13 +61,12 @@ targetHeight = 200 # target altitude above the surface, in meters
 targetNames = np.load("targetNames.npy", allow_pickle=True)
 targets = np.load("targets.npy", allow_pickle=True)
 
-print(targets)
-
 print("Targets list:\n")
 i = 0
 for x in targetNames:
     print(str(i) + ": " + x)
     i += 1
+
 def getChoice():
     try:
         print("\n")
