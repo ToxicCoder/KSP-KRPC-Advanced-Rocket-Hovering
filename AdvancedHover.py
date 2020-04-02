@@ -79,7 +79,7 @@ selection = getChoice()
 
 def waypointSelect(targets, selection, loop=False):
     if not loop:
-        choice = input("Do you want to go via a waypoint? ").lower()
+        choice = input("Do you want to go via a waypoint? (y/n): ").lower()
     else:
         choice = "yes"
     if choice == "y" or choice == "yes":
@@ -87,7 +87,7 @@ def waypointSelect(targets, selection, loop=False):
         targets[selection][1].append(targets[waypointSelection][0])
         targets[selection][5] = True
         print("Waypoint added")
-        choice = input("Do you want another waypoint? ").lower()
+        choice = input("Do you want another waypoint? (y/n): ").lower()
         if choice == "y" or choice == "yes":
             targets = waypointSelect(targets, selection, True)
     else:
@@ -135,6 +135,19 @@ else:
     longLat = False
     print("Secret: No location hold")
 
+print()
+land = input("Land at destination? (y/n): ").lower()
+if land == "y" or land == "yes":
+    land = True
+else:
+    land = False
+print()
+if land:
+    landEngine = input("Balance on engine when landed? (y/n): ").lower()
+    if landEngine == "y" or landEngine == "yes":
+        landEngine = True
+    else:
+        landEngine = False
 
 # More variable setup
 origTargHeight = targetHeight
@@ -295,7 +308,7 @@ while True:
             if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002/dropAccuracy or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
                 targetHeight = 40
                 drop = True
-                if abs(flight.surface_altitude / flight.vertical_speed) <= legDeployTime:
+                if abs(flight.surface_altitude / flight.vertical_speed) <= legDeployTime and not landEngine:
                     control.gear = True
             elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
                 drop = False
@@ -325,8 +338,12 @@ while True:
 vessel.auto_pilot.disengage()
 
 try:
-    if landed and not vessel.parts.legs[0].deployed:
+    if landed and not vessel.parts.legs[0].deployed and not landEngine:
         control.gear = True
+        control.sas = True
+        time.sleep(0.1)
+        control.sas_mode = control.sas_mode.radial
+    if landEngine:
         control.sas = True
         time.sleep(0.1)
         control.sas_mode = control.sas_mode.radial
