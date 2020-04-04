@@ -29,10 +29,11 @@ longitude = vessel.flight().longitude
 print(str(latitude)+", "+str(longitude))
 
 # Customisation
-frameRate = 60 # can be decreased depending on situation
+frameRate = 60 # Can be adjusted depending on situation - Min: 2 Max: 120 default: 60
 legDeployTime = 10 # Actual deploy time is 6 seconds but it's modified to improve timing
 maxHorizSpeed = 100 # Doesn't need to be set as the equations factor in enough data to stay safe
 dropSpeed = -7.5 # Can be adjusted to give cooler results
+overrideLandOnEngine = False # Change this to True to have manual control over landing on engine
 
 # Target Locations
 #
@@ -51,15 +52,15 @@ land = False
 longLat = True
 useSeaLevel = False
 dropAccuracy = 1
-targetHeight = 200 # target altitude above the surface, in meters
+targetHeight = 200 # target altitude above the surface, in metres
 
 # For adding custom targets use this format:
 # Add "Name of target" to targetNames
 # [[latitude, longitude], [waypointLatitude, waypointLongitude], altitude used in flight, use sea level altitude for flight, do you land or not (always True unless hovering), use waypoints, accuracy for landing drop]
 #
 # Select Target
-targetNames = np.load("targetNames.npy", allow_pickle=True)
-targets = np.load("targets.npy", allow_pickle=True)
+targetNames = np.load("targets/targetNames.npy", allow_pickle=True)
+targets = np.load("targets/targets.npy", allow_pickle=True)
 
 print("Targets list:\n")
 i = 0
@@ -114,7 +115,10 @@ if selection != -1:
         targetHeight = targetData[2]
         land = targetData[4]
         longLat = True
-        dropAccuracy = targetData[6]
+        if targetData[6] >= 4:
+            dropAccuracy = 2
+        else:
+            dropAccuracy = 1
         print(targetNames[selection])
     else:
         destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
@@ -136,18 +140,22 @@ else:
     print("Secret: No location hold")
 
 print()
-land = input("Land at destination? (y/n): ").lower()
+land = input("Land at destination? (y/n - default = y): ").lower()
 if land == "y" or land == "yes":
+    land = True
+elif land == "":
     land = True
 else:
     land = False
-print()
 if land:
-    landEngine = input("Balance on engine when landed? (y/n): ").lower()
-    if landEngine == "y" or landEngine == "yes":
-        landEngine = True
+    if overrideLandOnEngine:
+        landEngine = input("Balance on engine when landed? (y/n): ").lower()
+        if landEngine == "y" or landEngine == "yes":
+            landEngine = True
+        else:
+            landEngine = False
     else:
-        landEngine = False
+        landEngine = targetData[6] >= 4
 
 # More variable setup
 origTargHeight = targetHeight
@@ -187,6 +195,15 @@ def quaternion_to_euler(quaternionInput):
     yaw = math.atan2(t3, t4)
     return [yaw, pitch, roll]
 
+# Calculation from https://andrew.hedges.name/experiments/haversine/
+def getDistance(lat1, lon1, lat2, lon2, R=600000): # R = radius in metres
+    dlon = radians(lon2) - radians(lon1)
+    dlat = radians(lat2) - radians(lat1)
+    a = (sin(dlat/2))**2 + cos(lat1) * cos(lat2) * (sin(dlon/2))**2
+    c = 2 * atan2( sqrt(a), sqrt(1-a) )
+    d = R * c
+    return d
+
 def listAverage(listInput):
     output = 0
     for x in listInput:
@@ -215,9 +232,8 @@ while True:
     speedDifference = (speedCurrent - speedPrevious)/duration
     speedNext = speedCurrent + speedDifference
 
+    # Telemetry
     landed = str(vessel.situation)[16:] == "landed"
-
-    # Get data about flight
     latitude = vessel.flight().latitude
     longitude = vessel.flight().longitude
 
@@ -229,6 +245,10 @@ while True:
     heading = vessel.flight().heading
     angvel = vessel.angular_velocity(ref_frame)
 
+    # Calculate distance to target
+    distance = abs(getDistance(latitude, longitude, waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]))
+
+    # User input
     targetHeight += control.forward / 4
 
     # This is for the change from sea-level to surface based altitude measuring
@@ -251,7 +271,7 @@ while True:
     if not landed:
         if not drop:
             try:
-                ht = (F / vessel.available_thrust)
+                ht = ((F+(F-vessel.thrust)/2) / vessel.available_thrust)
             except ZeroDivisionError:
                 raise Exception("Loss of thrust detected! Please check your engines still exist.")
                 break
@@ -294,10 +314,13 @@ while True:
 
     # Physics warp control
     if longLat:
-        if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.001:
+        if distance < 2:
             if conn.space_center.physics_warp_factor != 0:
                 if finals:
                     conn.space_center.physics_warp_factor = 0
+        elif distance < 10:
+            if conn.space_center.physics_warp_factor != 1:
+                conn.space_center.physics_warp_factor = 1
         else:
             if conn.space_center.physics_warp_factor != 2:
                 conn.space_center.physics_warp_factor = 2
@@ -305,23 +328,23 @@ while True:
     # This is the landing procedure
     if land:
         if finals:
-            if abs(round(latitudeDiff + longitudeDiff, 4)) <= 0.0002/dropAccuracy or abs(round(latitudeDiff + longitudeDiff, 4)) == 0.0:
+            if distance <= 1/dropAccuracy or distance == 0.0:
                 targetHeight = 40
                 drop = True
                 if abs(flight.surface_altitude / flight.vertical_speed) <= legDeployTime and not landEngine:
                     control.gear = True
-            elif abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
+            elif distance < 10:
                 drop = False
                 control.gear = False
                 targetHeight = 40
                 useSeaLevel = False
-            elif not abs(round(latitudeDiff + longitudeDiff, 4)) < 0.003:
+            elif not distance < 10:
                 drop = False
                 control.gear = False
                 targetHeight = origTargHeight
                 useSealevel = True
         else:
-            if abs(round(latitudeDiff + longitudeDiff, 4)) < 0.01:
+            if distance < 100:
                 drop = False
                 targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
                 currentWaypointID += 1

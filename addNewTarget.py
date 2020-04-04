@@ -12,7 +12,7 @@ control.sas_mode = control.sas_mode.radial
 control.rcs = True
 control.activate_next_stage()
 
-print("Please follow the instructions on the wiki page or the 'Saving New Locations.md' file\n\n")
+print(r"Please follow the instructions on the wiki page or the 'guides/Saving New Locations.md' file\n\n")
 
 def displayTargets(targetNames):
 	print("Current Targets:\n")
@@ -21,8 +21,8 @@ def displayTargets(targetNames):
 	    print(str(i) + ": " + x)
 	    i += 1
 
-targetNames = np.load("targetNames.npy", allow_pickle=True)
-targets = np.load("targets.npy", allow_pickle=True)
+targetNames = np.load("targets/targetNames.npy", allow_pickle=True)
+targets = np.load("targets/targets.npy", allow_pickle=True)
 
 displayTargets(targetNames)
 
@@ -59,11 +59,11 @@ except KeyboardInterrupt:
 		targetNames = np.append(targetNames, name)
 		targets = list(targets)
 		targets.append([latLon, [], (round(altitude/10)*10)+10, True, True, False, landingAccuracy])
-		np.save("targetNames.npy", targetNames)
-		np.save("targets.npy", targets)
+		np.save("targets/targetNames.npy", targetNames)
+		np.save("targets/targets.npy", targets)
 		print("Location saved!")
-		targetNames = np.load("targetNames.npy", allow_pickle=True)
-		targets = np.load("targets.npy", allow_pickle=True)
+		targetNames = np.load("targets/targetNames.npy", allow_pickle=True)
+		targets = np.load("targets/targets.npy", allow_pickle=True)
 		print()
 		displayTargets(targetNames)
 	else:
@@ -82,5 +82,5 @@ except KeyboardInterrupt:
 #        [[-0.058009709890787194, -74.64144279145307], [], 40, False, True, False, 4], # Water Tower SPH
 #        [[-0.09212809071597255, -74.55249954150645], [], 40, False, True, False, 4]] # Water Tower launchpad
 #
-#np.save("targetNames.npy", targetNames)
-#np.save("targets.npy", targets)
+#np.save("targets/targetNames.npy", targetNames)
+#np.save("targets/targets.npy", targets)
