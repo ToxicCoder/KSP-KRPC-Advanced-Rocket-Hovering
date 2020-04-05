@@ -17,10 +17,6 @@ ref_frame = conn.space_center.ReferenceFrame.create_hybrid(
     rotation=vessel.surface_reference_frame)
 
 vessel.control.input_mode = vessel.control.input_mode.override
-control.sas = True
-time.sleep(0.1)
-control.sas_mode = control.sas_mode.radial
-control.rcs = True
 control.activate_next_stage()
 
 latitude = vessel.flight().latitude
@@ -53,6 +49,15 @@ longLat = True
 useSeaLevel = False
 dropAccuracy = 1
 targetHeight = 200 # target altitude above the surface, in metres
+hasRCS = len(vessel.parts.rcs) != 0
+hasSAS = vessel.parts.with_module("ModuleSAS") != 0
+
+def setSASwithMode(mode):
+    control.sas = True
+    time.sleep(0.1)
+    control.sas_mode = mode
+
+setSASwithMode(control.sas_mode.radial)
 
 # For adding custom targets use this format:
 # Add "Name of target" to targetNames
@@ -68,13 +73,13 @@ for x in targetNames:
     print(str(i) + ": " + x)
     i += 1
 
-def getChoice():
+def getChoice(question="Please select a target's number from the list: "):
     try:
         print("\n")
-        selection = int(input("Please select a target's number from the list: "))
+        selection = int(input(question))
     except ValueError:
         print("INVALID CHOICE")
-        selection = getChoice()
+        selection = getChoice(question)
     return selection
 selection = getChoice()
 
@@ -84,7 +89,7 @@ def waypointSelect(targets, selection, loop=False):
     else:
         choice = "yes"
     if choice == "y" or choice == "yes":
-        waypointSelection = int(input("Please select a waypoint to go via: "))
+        waypointSelection = getChoice("Please select a waypoint to go via: ")
         targets[selection][1].append(targets[waypointSelection][0])
         targets[selection][5] = True
         print("Waypoint added")
@@ -221,7 +226,7 @@ finals = False
 a = 0
 openLegs = False
 
-control.rcs = True
+control.rcs = hasRCS
 
 # Main loop
 while True:
@@ -231,6 +236,17 @@ while True:
     speedCurrent = flight.vertical_speed
     speedDifference = (speedCurrent - speedPrevious)/duration
     speedNext = speedCurrent + speedDifference
+
+    # Emergency stop
+    if vessel.available_thrust == 0:
+        if vessel.resources.amount("Oxidizer") == 0:
+            raise Exception("Loss of thrust detected! Please check you still have oxidizer. You are probably going to crash now.")
+        elif vessel.resources.amount("LiquidFuel") == 0:
+            raise Exception("Loss of thrust detected! Please check you still have liquid fuel. You are probably going to crash now.")
+        else:
+            raise Exception("Loss of thrust detected! Please check your engines still exist.")
+    if vessel.resources.amount("ElectricCharge") == 0:
+        raise Exception("Voltage drop detected! Cannot interface with rocket. Terminating connection.")
 
     # Telemetry
     landed = str(vessel.situation)[16:] == "landed"
@@ -246,7 +262,7 @@ while True:
     angvel = vessel.angular_velocity(ref_frame)
 
     # Calculate distance to target
-    distance = abs(getDistance(latitude, longitude, waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]))
+    distance = abs(getDistance(latitude, longitude, targetLatitude, targetLongitude))
 
     # User input
     targetHeight += control.forward / 4
@@ -266,8 +282,6 @@ while True:
 
     # Compute throttle setting using newton's law F=ma and change throttle
     F = vessel.mass * a
-    if vessel.available_thrust == 0:
-        raise Exception("Loss of thrust detected! Please check your engines still exist.")
     if not landed:
         if not drop:
             try:
@@ -291,11 +305,11 @@ while True:
     touchDown = finals and abs(flight.surface_altitude / flight.vertical_speed) < 3
     if longLat and not touchDown:
         if abs(velocity[2]) < maxHorizSpeed:
-            longitudeControl = ((longitudeDiff*16)*35) - (velocity[2]/2) #((np.clip(longitudeDiff, -0.02, 0.02)*16)*35) - (velocity[2]/2)
+            longitudeControl = (((longitudeDiff*16)*35)*np.clip(distance/100, 0.5, 1)) - (velocity[2]/2) #((np.clip(longitudeDiff, -0.02, 0.02)*16)*35) - (velocity[2]/2)
         else:
             longitudeControl = -velocity[2] / maxHorizSpeed
         if abs(velocity[1]) < maxHorizSpeed:
-            latitudeControl = -(((latitudeDiff*16)*35) - (velocity[1]/2)) #-(((np.clip(latitudeDiff, -0.02, 0.02)*16)*35) - (velocity[1]/2))
+            latitudeControl = -((((latitudeDiff*16)*35)*np.clip(distance/100, 0.5, 1)) - (velocity[1]/2)) #-(((np.clip(latitudeDiff, -0.02, 0.02)*16)*35) - (velocity[1]/2))
         else:
             latitudeControl = velocity[1] / maxHorizSpeed
 
@@ -314,7 +328,7 @@ while True:
 
     # Physics warp control
     if longLat:
-        if distance < 2:
+        if distance <= 1/dropAccuracy:
             if conn.space_center.physics_warp_factor != 0:
                 if finals:
                     conn.space_center.physics_warp_factor = 0
@@ -344,7 +358,7 @@ while True:
                 targetHeight = origTargHeight
                 useSealevel = True
         else:
-            if distance < 100:
+            if distance < 200:
                 drop = False
                 targetLatitude, targetLongitude = waypointLatLon[currentWaypointID][0], waypointLatLon[currentWaypointID][1]
                 currentWaypointID += 1
@@ -363,12 +377,13 @@ vessel.auto_pilot.disengage()
 try:
     if landed and not vessel.parts.legs[0].deployed and not landEngine:
         control.gear = True
-        control.sas = True
-        time.sleep(0.1)
-        control.sas_mode = control.sas_mode.radial
+        if hasSAS:
+            setSASwithMode(control.sas_mode.radial)
     if landEngine:
-        control.sas = True
-        time.sleep(0.1)
-        control.sas_mode = control.sas_mode.radial
+        if hasSAS:
+            setSASwithMode(control.sas_mode.radial)
 except:
     pass
+
+time.sleep(2)
+print(f"Final distance from destination: {round(distance, 4)}m")
