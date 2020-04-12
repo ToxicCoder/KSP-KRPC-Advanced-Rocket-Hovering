@@ -107,42 +107,32 @@ targetLatitude, targetLongitude = 0, 0
 
 targetData = targets[selection]
 
-if selection != -1:
-    if targetData[0] != -1:
-        if targetData[5]:
-            targetLatitude, targetLongitude = targetData[1][0][0], targetData[1][0][1]
-            waypointLatLon = targetData[1]
-            waypointLatLon.append(targetData[0])
-        else:
-            targetLatitude, targetLongitude = targetData[0][0], targetData[0][1]
-            waypointLatLon = [targetData[0]]
-        useSealevel = targetData[3]
-        targetHeight = targetData[2]
-        land = targetData[4]
-        longLat = True
-        if targetData[6] >= 4:
-            dropAccuracy = 2
-        else:
-            dropAccuracy = 1
-        print(targetNames[selection])
+if targetData[0] != -1:
+    if targetData[5]:
+        targetLatitude, targetLongitude = targetData[1][0][0], targetData[1][0][1]
+        waypointLatLon = targetData[1]
+        waypointLatLon.append(targetData[0])
     else:
-        destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
-        targetLatitude, targetLongitude = vessel.flight().latitude, vessel.flight().longitude
-        waypointLatLon = [[vessel.flight().latitude, vessel.flight().longitude]]
-        useSeaLevel = False
-        targetHeight = 40
-        land = False
-        longLat = False
-        print("Just Hover")
+        targetLatitude, targetLongitude = targetData[0][0], targetData[0][1]
+        waypointLatLon = [targetData[0]]
+    useSealevel = targetData[3]
+    targetHeight = targetData[2]
+    land = targetData[4]
+    longLat = True
+    if targetData[6] >= 4:
+        dropAccuracy = 2
+    else:
+        dropAccuracy = 1
+    print(targetNames[selection])
 else:
     destinationLatitude, destinationLongitude = vessel.flight().latitude, vessel.flight().longitude
     targetLatitude, targetLongitude = vessel.flight().latitude, vessel.flight().longitude
     waypointLatLon = [[vessel.flight().latitude, vessel.flight().longitude]]
-    useSeaLevel = True
-    targetHeight = 100
+    useSeaLevel = False
+    targetHeight = 40
     land = False
     longLat = False
-    print("Secret: No location hold")
+    print("Just Hover")
 
 print()
 land = input("Land at destination? (y/n - default = y): ").lower()
@@ -288,7 +278,6 @@ while True:
                 ht = ((F+(F-vessel.thrust)/2) / vessel.available_thrust)
             except ZeroDivisionError:
                 raise Exception("Loss of thrust detected! Please check your engines still exist.")
-                break
             control.throttle = ht+(ht*(flight.pitch/90))
         else:
             try:
@@ -302,25 +291,43 @@ while True:
 
     # Position Control
     velocity = vessel.flight(ref_frame).velocity
-    touchDown = finals and abs(flight.surface_altitude / flight.vertical_speed) < 3
-    if longLat and not touchDown:
-        if abs(velocity[2]) < maxHorizSpeed:
-            longitudeControl = (((longitudeDiff*16)*35)*np.clip(distance/100, 0.5, 1)) - (velocity[2]/2) #((np.clip(longitudeDiff, -0.02, 0.02)*16)*35) - (velocity[2]/2)
-        else:
-            longitudeControl = -velocity[2] / maxHorizSpeed
-        if abs(velocity[1]) < maxHorizSpeed:
-            latitudeControl = -((((latitudeDiff*16)*35)*np.clip(distance/100, 0.5, 1)) - (velocity[1]/2)) #-(((np.clip(latitudeDiff, -0.02, 0.02)*16)*35) - (velocity[1]/2))
-        else:
-            latitudeControl = velocity[1] / maxHorizSpeed
+    # Calculate required motion
+    if abs(velocity[2]) < maxHorizSpeed:
+        longitudeControl = (((longitudeDiff*16)*35)*np.clip(distance/100, 0.5, 1)) - (velocity[2]/2) # ((np.clip(longitudeDiff, -0.02, 0.02)*16)*35) - (velocity[2]/2)
+    else:
+        longitudeControl = -velocity[2] / maxHorizSpeed
+    if abs(velocity[1]) < maxHorizSpeed:
+        latitudeControl = -((((latitudeDiff*16)*35)*np.clip(distance/100, 0.5, 1)) - (velocity[1]/2)) # -(((np.clip(latitudeDiff, -0.02, 0.02)*16)*35) - (velocity[1]/2))
+    else:
+        latitudeControl = velocity[1] / maxHorizSpeed
 
-        if finals:
-            controlRot = [90, -latitudeControl*10, longitudeControl*10]
-        else:
-            controlRot = [90, (-latitudeControl*5)/(abs(ht)*2), (longitudeControl*5)/(abs(ht)*2)]
+    if finals:
+        controlRot = [90, -latitudeControl*10, longitudeControl*10]
+    else:
+        controlRot = [90, (-latitudeControl*5)/(abs(ht)*2), (longitudeControl*5)/(abs(ht)*2)]
+
+    touchDown = drop and distance <= (1/dropAccuracy)+0.5# and abs(flight.surface_altitude / flight.vertical_speed) <= legDeployTime
+    # Apply calculated motion
+    if longLat and distance > 2: # Apply via rotation
         controlRot[1] = np.clip(controlRot[1], -45, 45)
         controlRot[2] = np.clip(controlRot[2], -45, 45)
         vessel.auto_pilot.target_direction = controlRot
         apDirection = vessel.auto_pilot.target_direction
+        control.right = 0
+        control.up = 0
+    elif drop:
+        vessel.auto_pilot.target_roll = 0
+        vessel.auto_pilot.target_heading = 0
+        vessel.auto_pilot.target_pitch = 90
+        if hasRCS: # Apply via RCS
+            if abs(velocity[2]) < 15:
+                control.right = ((((targetLongitude - longitude)*16)*50) - (velocity[2]/2))*20
+            else:
+                control.right = -velocity[2] / 15 / 2
+            if abs(velocity[1]) < 15:
+                control.up = (-((((targetLatitude - latitude)*16)*50) - (velocity[1]/2)))*20
+            else:
+                control.up = velocity[1] / 15 / 2
     else:
         vessel.auto_pilot.target_roll = 0
         vessel.auto_pilot.target_heading = 0
@@ -332,7 +339,7 @@ while True:
             if conn.space_center.physics_warp_factor != 0:
                 if finals:
                     conn.space_center.physics_warp_factor = 0
-        elif distance < 10:
+        elif distance < 5:
             if conn.space_center.physics_warp_factor != 1:
                 conn.space_center.physics_warp_factor = 1
         else:
@@ -385,5 +392,6 @@ try:
 except:
     pass
 
+print("\n")
 time.sleep(2)
 print(f"Final distance from destination: {round(distance, 4)}m")
