@@ -85,7 +85,7 @@ selection = getChoice()
 
 def waypointSelect(targets, selection, loop=False):
     if not loop:
-        choice = input("Do you want to go via a waypoint? (y/n): ").lower()
+        choice = input("Do you want to go via a waypoint? (y/n - default = n): ").lower()
     else:
         choice = "yes"
     if choice == "y" or choice == "yes":
@@ -93,7 +93,7 @@ def waypointSelect(targets, selection, loop=False):
         targets[selection][1].append(targets[waypointSelection][0])
         targets[selection][5] = True
         print("Waypoint added")
-        choice = input("Do you want another waypoint? (y/n): ").lower()
+        choice = input("Do you want another waypoint? (y/n - default = n): ").lower()
         if choice == "y" or choice == "yes":
             targets = waypointSelect(targets, selection, True)
     else:
@@ -236,7 +236,7 @@ while True:
         else:
             raise Exception("Loss of thrust detected! Please check your engines still exist.")
     if vessel.resources.amount("ElectricCharge") == 0:
-        raise Exception("Voltage drop detected! Cannot interface with rocket. Terminating connection.")
+        raise Exception("Voltage drop detected! Cannot interface with rocket. Terminating program.")
 
     # Telemetry
     landed = str(vessel.situation)[16:] == "landed"
